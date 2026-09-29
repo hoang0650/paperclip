@@ -12,6 +12,8 @@ import {
 } from "@paperclipai/db";
 import type { Config } from "../config.js";
 import { resolvePaperclipInstanceId } from "../home-paths.js";
+import { resolveAimarketsSsoSecret } from "./aimarkets-sso.js";
+import { aimarketsSsoPlugin } from "./aimarkets-sso-plugin.js";
 import {
   workspaceLoginHandoffPlugin,
   type WorkspaceHandoffExpectedIdentity,
@@ -257,6 +259,27 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
     publicUrl,
   });
 
+  const plugins = [
+    ...(resolveWorkspaceHandoffIdentity(config)
+      ? [
+          workspaceLoginHandoffPlugin({
+            db,
+            // Re-resolved per exchange so a hot restart cannot keep validating
+            // against an origin the control plane has since republished.
+            resolveExpectedIdentity: () =>
+              resolveWorkspaceHandoffIdentity(config) ?? {
+                key: null,
+                instanceId: null,
+                executionWorkspaceId: null,
+                companyId: null,
+                origin: null,
+              },
+          }),
+        ]
+      : []),
+    ...(resolveAimarketsSsoSecret() ? [aimarketsSsoPlugin({ db })] : []),
+  ];
+
   const authConfig = {
     baseURL: baseUrl,
     secret,
@@ -284,25 +307,8 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
     // Registered only for a managed workspace instance: the plugin is what makes
     // `Open workspace` password-independent, and a control-plane instance that
     // was never handed a workspace key must not expose the exchange at all.
-    ...(resolveWorkspaceHandoffIdentity(config)
-      ? {
-          plugins: [
-            workspaceLoginHandoffPlugin({
-              db,
-              // Re-resolved per exchange so a hot restart cannot keep validating
-              // against an origin the control plane has since republished.
-              resolveExpectedIdentity: () =>
-                resolveWorkspaceHandoffIdentity(config) ?? {
-                  key: null,
-                  instanceId: null,
-                  executionWorkspaceId: null,
-                  companyId: null,
-                  origin: null,
-                },
-            }),
-          ],
-        }
-      : {}),
+    // The AI Markets SSO exchange likewise exists only when its secret is set.
+    ...(plugins.length > 0 ? { plugins } : {}),
   };
 
   if (!baseUrl) {

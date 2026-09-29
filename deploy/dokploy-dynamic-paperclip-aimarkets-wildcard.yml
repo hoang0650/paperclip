@@ -1,0 +1,53 @@
+# Dokploy → dynamic/paperclip-aimarkets-wildcard.yml
+# DNS: paperclip + *.paperclip A → 72.62.72.165
+# TLS pattern = same as ai.aimarkets.vn (denglish): web+websecure, LE HTTP-01
+# Tenant hosts: {userId}.paperclip.aimarkets.vn (24-hex MongoId). HTTP-01 cannot issue a wildcard
+# cert, so each buyer host also needs an exact-host cert router (openclaw/deploy/_apply-aimarkets-user-certs.py).
+# Replace the service URL with the Dokploy app name of the Paperclip service (port 3100).
+
+http:
+  routers:
+    paperclip-aimarkets-shared-http:
+      rule: "Host(`paperclip.aimarkets.vn`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: paperclip-aimarkets-svc
+      priority: 200
+
+    paperclip-aimarkets-shared-https:
+      rule: "Host(`paperclip.aimarkets.vn`)"
+      entryPoints:
+        - websecure
+      service: paperclip-aimarkets-svc
+      priority: 200
+      tls:
+        certResolver: letsencrypt
+        domains:
+          - main: "paperclip.aimarkets.vn"
+
+    paperclip-aimarkets-tenant-http:
+      rule: "HostRegexp(`^[a-f0-9]{24}\\.paperclip\\.aimarkets\\.vn$`)"
+      entryPoints:
+        - web
+      middlewares:
+        - redirect-to-https
+      service: paperclip-aimarkets-svc
+      priority: 50
+
+    paperclip-aimarkets-tenant-https:
+      rule: "HostRegexp(`^[a-f0-9]{24}\\.paperclip\\.aimarkets\\.vn$`)"
+      entryPoints:
+        - websecure
+      service: paperclip-aimarkets-svc
+      priority: 50
+      tls:
+        certResolver: letsencrypt
+
+  services:
+    paperclip-aimarkets-svc:
+      loadBalancer:
+        servers:
+          - url: "http://aimarketplace-paperclip:3100"
+        passHostHeader: true
