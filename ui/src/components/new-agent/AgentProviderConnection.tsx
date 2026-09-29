@@ -115,9 +115,10 @@ export function AgentProviderConnection({
     ? { ...savedKeys.storedLogin, data: undefined, isPending: false, isError: false }
     : savedKeys.storedLogin;
   const savedManagedAccount = useRef<{ connectionId: string; grantId: string } | null>(null);
+  const subscriptionSignInUnavailable = !canLogin && !canUseLocalLogin;
   const method = methodChoice ?? (
     (savedKeys.subscriptions.length > 0 || (adapterType === "claude_local" && !savedSubscription && storedLogin.data))
-      ? "subscription" : savedKeys.options.length ? "api" : "subscription"
+      ? "subscription" : savedKeys.options.length || subscriptionSignInUnavailable ? "api" : "subscription"
   );
   const localLogin = useLocalAiLogin(companyId, managedAccount?.intent ?? {
     provider: aiProvider, method: "subscription", name: `My ${provider} subscription`,
