@@ -12,7 +12,6 @@ import { instanceSettingsApi } from "@/api/instanceSettings";
 import { queryKeys } from "@/lib/queryKeys";
 import { resolveAdapterTestEnvironmentId, resolveLocalDefaultEnvironmentId, resolveManagedSandboxEnvironmentId } from "@/lib/adapter-test-environment";
 import { resolveForcedKubernetesEnvironment } from "@/lib/forced-kubernetes-environment";
-import { useApiKeyCredentialsPreferred } from "@/components/onboarding/useApiKeyCredentialsPreferred";
 
 type Props = {
   companyId: string;
@@ -42,7 +41,6 @@ function SubscriptionConnectionStep({ companyId, provider, initialMethod, fixedM
   const envs = useQuery({ queryKey: queryKeys.environments.list(companyId), queryFn: () => environmentsApi.list(companyId) });
   const caps = useQuery({ queryKey: queryKeys.environments.capabilities(companyId), queryFn: () => environmentsApi.capabilities(companyId) });
   const settings = useQuery({ queryKey: queryKeys.instance.settings, queryFn: instanceSettingsApi.get });
-  const apiKeyCredentialsPreferred = useApiKeyCredentialsPreferred();
   const experimental = useQuery({ queryKey: queryKeys.instance.experimentalSettings, queryFn: instanceSettingsApi.getExperimental });
   const general = useQuery({ queryKey: queryKeys.instance.generalSettings, queryFn: instanceSettingsApi.getGeneral });
   const forced = resolveForcedKubernetesEnvironment(general.data?.executionMode, envs.data ?? []);
@@ -75,9 +73,6 @@ function SubscriptionConnectionStep({ companyId, provider, initialMethod, fixedM
   const loading = [envs, caps, settings, experimental, general].some((query) => query.isPending);
   const error = environmentError ?? [envs, caps, settings, experimental, general].find((query) => query.error)?.error?.message;
   const intent: AiConnectionLoginIntent = { provider, method: "subscription", name, ownership, agentIds, allAgents, connectionId };
-  // New connections on a hosted instance without any sign-in environment start on "enter API key".
-  const startMethod: AiAuthMethod | undefined =
-    !connectionId && !canLogin && apiKeyCredentialsPreferred ? "api_key" : initialMethod;
   return <div className="mx-auto w-full min-w-0 max-w-xl space-y-6">
     <label className="block space-y-2 text-sm">Connection name<Input value={name} onChange={(event) => setName(event.target.value)} disabled={Boolean(connectionId)} /></label>
     {!suppliedEnvironmentId && !forced.forced && loginEnvironments.length > 1 && <Select value={environmentId ?? ""} onValueChange={setChosenEnvironment}>
@@ -86,7 +81,7 @@ function SubscriptionConnectionStep({ companyId, provider, initialMethod, fixedM
     </Select>}
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
     {loading ? <p role="status" className="text-sm text-muted-foreground">Preparing sign-in…</p> : <AgentProviderConnection
-      key={`${environmentId ?? "local"}:${startMethod ?? ""}`}
+      key={environmentId ?? "local"}
       companyId={companyId}
       adapterType={provider === "anthropic" ? "claude_local" : provider === "xai" ? "grok_local" : "codex_local"}
       environmentId={environmentId}
@@ -95,7 +90,7 @@ function SubscriptionConnectionStep({ companyId, provider, initialMethod, fixedM
       onBack={onCancel}
       onConnected={() => {}}
       testConnection={async () => false}
-      managedAccount={{ intent, initialMethod: startMethod, fixedMethod: (fixedMethod && startMethod === initialMethod) || Boolean(connectionId), disabled: loading || Boolean(error) || !name.trim(), onComplete: (result) => { void client.invalidateQueries({ queryKey: ["ai-connections", companyId] }); onComplete(result); } }}
+      managedAccount={{ intent, initialMethod, fixedMethod: fixedMethod || Boolean(connectionId), disabled: loading || Boolean(error) || !name.trim(), onComplete: (result) => { void client.invalidateQueries({ queryKey: ["ai-connections", companyId] }); onComplete(result); } }}
     />}
   </div>;
 }
