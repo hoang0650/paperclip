@@ -615,6 +615,13 @@ import {
 } from "./effective-run-config-fingerprints.js";
 import type { PluginWorkerManager } from "./plugin-worker-manager.js";
 import { serverVersion } from "../version.js";
+import { createPonytailRules } from "./ponytail.js";
+
+const getPonytailRules = createPonytailRules({
+  url: process.env.PONYTAIL_URL,
+  mode: process.env.PONYTAIL_MODE,
+  warn: (message, meta) => logger.warn(meta, message),
+});
 
 const MAX_LIVE_LOG_CHUNK_BYTES = 8 * 1024;
 const MAX_PERSISTED_LOG_CHUNK_CHARS = 64 * 1024;
@@ -21278,8 +21285,12 @@ export function heartbeatService(
       // Both CLI adapters and native context materialization use the same resolved set.
       runtimeSkillEntries.splice(0, runtimeSkillEntries.length, ...connectorSkillConfig.paperclipRuntimeSkills);
       const connectorDelivery = await prepareConnectorSkillDelivery(connectorSkillConfig, agent.adapterType);
-      // Always replace this runtime-only field; caller wake data cannot supply skills.
-      context.paperclipWake = { ...parseObject(context.paperclipWake), connectorSkillInstructions: connectorDelivery.instructions };
+      // Always replace these runtime-only fields; caller wake data cannot supply skills or rules.
+      context.paperclipWake = {
+        ...parseObject(context.paperclipWake),
+        connectorSkillInstructions: connectorDelivery.instructions,
+        ponytailRules: await getPonytailRules(),
+      };
       let runtimeConfig: Record<string, unknown> = connectorDelivery.config;
       const latestAgentConfigRevision = await getLatestAgentConfigRevision(
         agent.companyId,

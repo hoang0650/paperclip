@@ -2191,14 +2191,18 @@ export function selectPaperclipTaskMarkdown(
 // Runtime-only connector skills are supplied by the server after assignment resolution.
 // Shared-home adapters consume them here on fresh and resumed runs without installing
 // files into a user-wide skills directory. They are not part of serialized wake data.
+// Ponytail coding rules ride the same way, but only on fresh sessions: a resumed
+// session already carries them in its history, and resending costs tokens every wake.
 export function renderPaperclipWakePrompt(
   value: unknown,
   options: Parameters<typeof renderPaperclipWakePromptBody>[1] = {},
 ): string {
   const instructions = asString(parseObject(value).connectorSkillInstructions, "").trim();
+  const ponytail = options.resumedSession === true ? "" : asString(parseObject(value).ponytailRules, "").trim();
   return joinPromptSections([
     renderPaperclipWakePromptBody(value, options),
     instructions ? `## Assigned connector skills\n\n${instructions}` : "",
+    ponytail ? `## Coding rules\n\n${ponytail}` : "",
   ]);
 }
 

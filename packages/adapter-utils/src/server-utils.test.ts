@@ -1289,6 +1289,23 @@ describe("renderPaperclipWakePrompt", () => {
     });
   });
 
+  it("delivers Ponytail coding rules on fresh sessions only", () => {
+    const payload = {
+      reason: "issue_assigned",
+      issue: { id: "issue-1", identifier: "PAP-1", title: "Rules", status: "todo" },
+      commentWindow: { requestedCount: 0, includedCount: 0, missingCount: 0 },
+      comments: [],
+      fallbackFetchNeeded: false,
+      ponytailRules: "PONYTAIL MODE ACTIVE — level: compact\nWrite less code.",
+    };
+
+    expect(renderPaperclipWakePrompt(payload)).toContain(
+      "## Coding rules\n\nPONYTAIL MODE ACTIVE — level: compact",
+    );
+    expect(renderPaperclipWakePrompt(payload, { resumedSession: true })).not.toContain("PONYTAIL");
+    expect(renderPaperclipWakePrompt({ ...payload, ponytailRules: "" })).not.toContain("## Coding rules");
+  });
+
   it("suppresses the issue description when the prompt already carries the task-context markdown", () => {
     const payload = {
       reason: "issue_assigned",
