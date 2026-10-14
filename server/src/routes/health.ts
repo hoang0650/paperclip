@@ -1,4 +1,5 @@
 import { supportsLocalAiLogin } from "../services/local-ai-login-policy.js";
+import { resolveAimarketsSsoSecret } from "../auth/aimarkets-sso.js";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { Router } from "express";
 import type { Db } from "@paperclipai/db";
@@ -324,7 +325,12 @@ export function healthRoutes(
     // bootstrap_pending forever and lock every managed tenant out at the
     // claim screen. Self-hosted deployments (neither canonical managed signal)
     // are unaffected.
-    if (opts.deploymentMode === "authenticated" && !isCloudManagedInstance(runtimeEnv)) {
+    // AI Markets SSO deployments are the same shape: aimarkets.vn owns identity,
+    // each buyer is provisioned as owner of their own company on SSO and is
+    // deliberately never instance_admin (isolation between buyers). Without this
+    // the board shows "waiting on its first admin" to every buyer.
+    const aimarketsSsoManaged = Boolean(resolveAimarketsSsoSecret(runtimeEnv as NodeJS.ProcessEnv));
+    if (opts.deploymentMode === "authenticated" && !isCloudManagedInstance(runtimeEnv) && !aimarketsSsoManaged) {
       const roleCount = await db
         .select({ count: count() })
         .from(instanceUserRoles)
