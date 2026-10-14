@@ -531,6 +531,38 @@ describe("GET /health", () => {
     });
   });
 
+  it("reports bootstrapStatus ready for AI Markets SSO deployments (buyers are never instance admins)", async () => {
+    const { healthRoutes } = await import("../routes/health.js");
+    const db = {
+      execute: vi.fn().mockResolvedValue([{ "?column?": 1 }]),
+      select: vi.fn(() => ({
+        from: vi.fn(() => ({
+          where: vi.fn().mockResolvedValue([{ count: 0 }]),
+        })),
+      })),
+    } as unknown as Db;
+    const app = express();
+    app.use((req, _res, next) => {
+      (req as any).actor = { type: "none", source: "none" };
+      next();
+    });
+    app.use(
+      "/health",
+      healthRoutes(db, {
+        deploymentMode: "authenticated",
+        deploymentExposure: "public",
+        authReady: true,
+        companyDeletionEnabled: false,
+        serverInfo: testServerInfo,
+        runtimeEnv: { PAPERCLIP_SSO_SECRET: "test-aimarkets-sso-secret" } as never,
+      }),
+    );
+
+    const res = await request(app).get("/health");
+
+    expect(res.status).toBe(200);
+    expect(res.body.bootstrapStatus).toBe("ready");
+  });
   it("reports bootstrapStatus ready for cloud-managed instances regardless of instance admin count", async () => {
     vi.stubEnv("PAPERCLIP_CLOUD_TENANT_SERVER_TOKEN", "test-tenant-server-token");
     const { healthRoutes } = await import("../routes/health.js");
